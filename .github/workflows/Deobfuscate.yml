@@ -23,26 +23,30 @@ jobs:
       with:
         python-version: '3.10'
 
-    - name: Pembersihan Junk Code MoonSec Teliti (Python Clean)
+    - name: Pre-Processing Sakti (Wrapper Fungsi MoonSec V3)
       run: |
         python -c "
         with open('w.txt', 'r', encoding='utf-8', errors='ignore') as f:
             content = f.read()
         
-        # Cari titik awal murni dari fungsi return MoonSec
+        # Potong junk code awal biar bersih
         start_idx = content.find('return(function')
         if start_idx != -1:
             clean_content = content[start_idx:]
-            # Tulis ulang file rapet di baris 1 tanpa spasi/newline ampas
+            
+            # BUNGKUS KE DALAM FUNGSI LOKAL AGAR PARSER ANTLR4 TIDAK CRASH
+            # Ini memindahkan ekspresi return rumit ke dalam container aman
+            wrapped_content = 'local function _afriezzx_wrapper()\n' + clean_content + '\nend\n_afriezzx_wrapper()'
+            
             with open('w.txt', 'w', encoding='utf-8') as f:
-                f.write(clean_content)
-            print('[-] BERHASIL: File w.txt dibersihkan dengan presisi.')
+                f.write(wrapped_content)
+            print('[-] BERHASIL: Script MoonSec V3 berhasil dibungkus aman.')
         else:
-            print('[-] PERINGATAN: return(function tidak ditemukan, file tidak diubah.')
+            print('[-] GAGAL: return(function tidak ditemukan!')
         "
-        echo "=== TAMPILAN 120 KARAKTER PERTAMA W.TXT ==="
-        head -c 120 w.txt
-        echo -e "\n=========================================="
+        echo "=== TAMPILAN 150 KARAKTER PERTAMA W.TXT BARU ==="
+        head -c 150 w.txt
+        echo -e "\n==============================================="
 
     - name: Restore Dependencies
       run: dotnet restore MoonsecDeobfuscator.csproj
