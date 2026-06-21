@@ -18,19 +18,36 @@ jobs:
       with:
         dotnet-version: '8.0.x'
 
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+
+    - name: Pembersihan Junk Code MoonSec Teliti (Python Clean)
+      run: |
+        python -c "
+        with open('w.txt', 'r', encoding='utf-8', errors='ignore') as f:
+            content = f.read()
+        
+        # Cari titik awal murni dari fungsi return MoonSec
+        start_idx = content.find('return(function')
+        if start_idx != -1:
+            clean_content = content[start_idx:]
+            # Tulis ulang file rapet di baris 1 tanpa spasi/newline ampas
+            with open('w.txt', 'w', encoding='utf-8') as f:
+                f.write(clean_content)
+            print('[-] BERHASIL: File w.txt dibersihkan dengan presisi.')
+        else:
+            print('[-] PERINGATAN: return(function tidak ditemukan, file tidak diubah.')
+        "
+        echo "=== TAMPILAN 120 KARAKTER PERTAMA W.TXT ==="
+        head -c 120 w.txt
+        echo -e "\n=========================================="
+
     - name: Restore Dependencies
       run: dotnet restore MoonsecDeobfuscator.csproj
 
-    - name: Pembersihan junk code MoonSec V3 (Pre-Processing Aman)
-      run: |
-        # Menggunakan sed dengan pola yang sangat ketat hanya menghapus bagian pembuka gsub di baris awal
-        sed -i "s/([[This file was protected with MoonSec V3]]):gsub('.+', (function(a) __xirluziHIZB = a; end)); //" w.txt
-        
-        echo "=== CEK 150 KARAKTER PERTAMA W.TXT ==="
-        head -c 150 w.txt
-        echo -e "\n======================================="
-
-    - name: Jalankan Deobfuscator (Bypass Compiler Warning)
+    - name: Jalankan Deobfuscator
       run: |
         dotnet run --project MoonsecDeobfuscator.csproj -c Release --property:WarningLevel=0 -- -dev -i w.txt -o hasil_bongkar.luac
 
