@@ -18,38 +18,42 @@ jobs:
       with:
         dotnet-version: '8.0.x'
 
-    - name: Patch Source Code Deobfuscator (Anti-Crash Null Check)
-      run: |
-        echo "[-] Patching CstToAstVisitor.cs untuk menghindari NullReferenceException..."
-        
-        # PENTING: Mengubah kode C# agar mengembalikan array kosong/null-safe jika object ekspresi bernilai null
-        # Kita tembak langsung file source code deobfuscator-nya sebelum di-compile
-        cd src/Syntax/ || cd src/ || cd MoonsecDeobfuscator/src/Syntax/ || true
-        
-        if [ -f "CstToAstVisitor.cs" ]; then
-          # Tambahkan proteksi null check pada fungsi GetExpList dan VisitVar agar mengembalikan objek kosong daripada crash
-          sed -i 's/ctx.exp()/ctx.exp() ?? new Expression[0]/g' CstToAstVisitor.cs 2>/dev/null || true
-          sed -i 's/ctx.NAME().GetText()/ctx?.NAME()?.GetText() ?? "unknown"/g' CstToAstVisitor.cs 2>/dev/null || true
-          echo "[-] Patch sukses diterapkan pada source code."
-        else
-          # Jika folder terbalik, cari manual dan force replace
-          find . -name "CstToAstVisitor.cs" -exec sed -i 's/ctx.exp()/ctx.exp() ?? new Expression[0]/g' {} \;
-          find . -name "CstToAstVisitor.cs" -exec sed -i 's/ctx.NAME().GetText()/ctx?.NAME()?.GetText() ?? "unknown"/g' {} \;
-          echo "[-] Patch paksa via find selesai."
-        fi
-        cd $GITHUB_WORKSPACE
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
 
-    - name: Kembalikan w.txt ke bentuk murni awal
+    - name: Normalisasi Format MoonSec V3 (Python Fix)
       run: |
-        # Bersihkan total file w.txt tanpa bungkusan apapun, biarkan murni dari return(function(t,...)
-        sed -i "s/.*return(function/return(function/" w.txt
+        python -c "
+        with open('w.txt', 'r', encoding='utf-8', errors='ignore') as f:
+            content = f.read()
+        
+        # 1. Bersihkan junk code tulisan protected di paling awal
+        start_idx = content.find('return(function')
+        if start_idx != -1:
+            clean_content = content[start_idx:]
+            
+            # 2. Ubah kata kunci 'return(function' menjadi assignment variabel biasa 'moonsec_run = (function'
+            # Ini trik paling ampuh agar ANTLR parser menganggapnya sebagai deklarasi statement biasa, bukan return menggantung
+            fixed_content = clean_content.replace('return(function', 'moonsec_run = (function', 1)
+            
+            with open('w.txt', 'w', encoding='utf-8') as f:
+                f.write(fixed_content)
+            print('[-] BERHASIL: Format w.txt dinormalisasi menjadi assignment statement.')
+        else:
+            print('[-] GAGAL: Pola return tidak ditemukan!')
+        "
+        echo "=== LIHAT HASIL CONVERT 150 KARAKTER PERTAMA ==="
+        head -c 150 w.txt
+        echo -e "\n================================================"
 
     - name: Restore Dependencies
       run: dotnet restore MoonsecDeobfuscator.csproj
 
-    - name: Jalankan Deobfuscator (Mode Force Bypass)
+    - name: Jalankan Deobfuscator
       run: |
-        dotnet run --project MoonsecDeobfuscator.csproj -c Release --property:WarningLevel=0 -- -dev -i w.txt -o hasil_bongkar.luac
+        dotnet run --project MoonsecDeobfuscator.csproj -c Release -- -dev -i w.txt -o hasil_bongkar.luac
 
     - name: Upload Hasil Bongkar
       uses: actions/upload-artifact@v4
