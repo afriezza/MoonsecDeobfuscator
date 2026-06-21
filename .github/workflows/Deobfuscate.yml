@@ -1,7 +1,9 @@
 name: Auto Moonsec Deobfuscator
 
 on:
-  workflow_dispatch: # Biar bisa lu klik tombol RUN manual kapan aja
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
 
 jobs:
   deobfuscate:
@@ -9,27 +11,31 @@ jobs:
 
     steps:
     - name: Checkout Repository
-      uses: actions/checkout@v4
+      uses: actions/checkout@v3
 
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v4
+    - name: Setup .NET Core SDK
+      uses: actions/setup-dotnet@v3
       with:
-        dotnet-version: 8.0.x
+        dotnet-version: '8.0.x'
 
-    - name: Build Tool
-      # Kita langsung build file .csproj yang ada di folder root hasil fork lu
-      run: dotnet build -c Release
+    - name: Restore Dependencies
+      run: dotnet restore MoonsecDeobfuscator.csproj
 
-    - name: Run Deobfuscator
-      # Di sini jalurnya gua benerin murni ke file .csproj yang pas
+    - name: Pembersihan junk code MoonSec V3 (Pre-Processing Aman)
       run: |
-        dotnet run --project MoonsecDeobfuscator.csproj -- -dev -i w.txt -o hasil_bongkar.luac
-        dotnet run --project MoonsecDeobfuscator.csproj -- -dis -i w.txt -o hasil_disassembly.txt
+        # Menggunakan sed dengan pola yang sangat ketat hanya menghapus bagian pembuka gsub di baris awal
+        sed -i "s/([[This file was protected with MoonSec V3]]):gsub('.+', (function(a) __xirluziHIZB = a; end)); //" w.txt
+        
+        echo "=== CEK 150 KARAKTER PERTAMA W.TXT ==="
+        head -c 150 w.txt
+        echo -e "\n======================================="
 
-    - name: Upload Hasil Bongkar ke Artifacts
+    - name: Jalankan Deobfuscator (Bypass Compiler Warning)
+      run: |
+        dotnet run --project MoonsecDeobfuscator.csproj -c Release --property:WarningLevel=0 -- -dev -i w.txt -o hasil_bongkar.luac
+
+    - name: Upload Hasil Bongkar
       uses: actions/upload-artifact@v4
       with:
-        name: hasil-moonsec-luac
-        path: |
-          hasil_bongkar.luac
-          hasil_disassembly.txt
+        name: Hasil-Bongkar-Moonsec
+        path: hasil_bongkar.luac
