@@ -23,7 +23,7 @@ jobs:
       with:
         python-version: '3.10'
 
-    - name: Normalisasi Format MoonSec V3 (Python Fix)
+    - name: Pembersihan & Reformat Kode Raksasa (Python Token Fix)
       run: |
         python -c "
         with open('w.txt', 'r', encoding='utf-8', errors='ignore') as f:
@@ -32,21 +32,23 @@ jobs:
         # 1. Bersihkan junk code tulisan protected di paling awal
         start_idx = content.find('return(function')
         if start_idx != -1:
-            clean_content = content[start_idx:]
-            
-            # 2. Ubah kata kunci 'return(function' menjadi assignment variabel biasa 'moonsec_run = (function'
-            # Ini trik paling ampuh agar ANTLR parser menganggapnya sebagai deklarasi statement biasa, bukan return menggantung
-            fixed_content = clean_content.replace('return(function', 'moonsec_run = (function', 1)
-            
-            with open('w.txt', 'w', encoding='utf-8') as f:
-                f.write(fixed_content)
-            print('[-] BERHASIL: Format w.txt dinormalisasi menjadi assignment statement.')
-        else:
-            print('[-] GAGAL: Pola return tidak ditemukan!')
+            content = content[start_idx:]
+        
+        # 2. Pecah baris raksasa berdasarkan delimiter Lua agar ANTLR Parser tidak muntah
+        # Kita tambahkan newline setelah ';', 'then', 'do', 'else', dan 'end '
+        content = content.replace(';', ';\n')
+        content = content.replace('then', 'then\n')
+        content = content.replace('do', 'do\n')
+        content = content.replace('else', '\nelse\n')
+        content = content.replace('end', '\nend\n')
+        
+        with open('w.txt', 'w', encoding='utf-8') as f:
+            f.write(content)
+        print('[-] BERHASIL: File w.txt berhasil dipecah menjadi multi-line rapi.')
         "
-        echo "=== LIHAT HASIL CONVERT 150 KARAKTER PERTAMA ==="
-        head -c 150 w.txt
-        echo -e "\n================================================"
+        echo "=== LIHAT 10 BARIS PERTAMA HASIL REFORMAT ==="
+        head -n 10 w.txt
+        echo "============================================="
 
     - name: Restore Dependencies
       run: dotnet restore MoonsecDeobfuscator.csproj
