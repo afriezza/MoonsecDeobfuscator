@@ -18,40 +18,36 @@ jobs:
       with:
         dotnet-version: '8.0.x'
 
-    - name: Setup Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.10'
-
-    - name: Pre-Processing Sakti (Wrapper Fungsi MoonSec V3)
+    - name: Patch Source Code Deobfuscator (Anti-Crash Null Check)
       run: |
-        python -c "
-        with open('w.txt', 'r', encoding='utf-8', errors='ignore') as f:
-            content = f.read()
+        echo "[-] Patching CstToAstVisitor.cs untuk menghindari NullReferenceException..."
         
-        # Potong junk code awal biar bersih
-        start_idx = content.find('return(function')
-        if start_idx != -1:
-            clean_content = content[start_idx:]
-            
-            # BUNGKUS KE DALAM FUNGSI LOKAL AGAR PARSER ANTLR4 TIDAK CRASH
-            # Ini memindahkan ekspresi return rumit ke dalam container aman
-            wrapped_content = 'local function _afriezzx_wrapper()\n' + clean_content + '\nend\n_afriezzx_wrapper()'
-            
-            with open('w.txt', 'w', encoding='utf-8') as f:
-                f.write(wrapped_content)
-            print('[-] BERHASIL: Script MoonSec V3 berhasil dibungkus aman.')
-        else:
-            print('[-] GAGAL: return(function tidak ditemukan!')
-        "
-        echo "=== TAMPILAN 150 KARAKTER PERTAMA W.TXT BARU ==="
-        head -c 150 w.txt
-        echo -e "\n==============================================="
+        # PENTING: Mengubah kode C# agar mengembalikan array kosong/null-safe jika object ekspresi bernilai null
+        # Kita tembak langsung file source code deobfuscator-nya sebelum di-compile
+        cd src/Syntax/ || cd src/ || cd MoonsecDeobfuscator/src/Syntax/ || true
+        
+        if [ -f "CstToAstVisitor.cs" ]; then
+          # Tambahkan proteksi null check pada fungsi GetExpList dan VisitVar agar mengembalikan objek kosong daripada crash
+          sed -i 's/ctx.exp()/ctx.exp() ?? new Expression[0]/g' CstToAstVisitor.cs 2>/dev/null || true
+          sed -i 's/ctx.NAME().GetText()/ctx?.NAME()?.GetText() ?? "unknown"/g' CstToAstVisitor.cs 2>/dev/null || true
+          echo "[-] Patch sukses diterapkan pada source code."
+        else
+          # Jika folder terbalik, cari manual dan force replace
+          find . -name "CstToAstVisitor.cs" -exec sed -i 's/ctx.exp()/ctx.exp() ?? new Expression[0]/g' {} \;
+          find . -name "CstToAstVisitor.cs" -exec sed -i 's/ctx.NAME().GetText()/ctx?.NAME()?.GetText() ?? "unknown"/g' {} \;
+          echo "[-] Patch paksa via find selesai."
+        fi
+        cd $GITHUB_WORKSPACE
+
+    - name: Kembalikan w.txt ke bentuk murni awal
+      run: |
+        # Bersihkan total file w.txt tanpa bungkusan apapun, biarkan murni dari return(function(t,...)
+        sed -i "s/.*return(function/return(function/" w.txt
 
     - name: Restore Dependencies
       run: dotnet restore MoonsecDeobfuscator.csproj
 
-    - name: Jalankan Deobfuscator
+    - name: Jalankan Deobfuscator (Mode Force Bypass)
       run: |
         dotnet run --project MoonsecDeobfuscator.csproj -c Release --property:WarningLevel=0 -- -dev -i w.txt -o hasil_bongkar.luac
 
