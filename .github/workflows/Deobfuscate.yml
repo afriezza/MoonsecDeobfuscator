@@ -16,20 +16,15 @@ jobs:
       with:
         dotnet-version: 8.0.x
 
-    - name: Download w.txt from URL or Create Raw
-      run: |
-        # Tips: Lu bisa upload w.txt lu ke pastebin/discord, terus ganti URL di bawah ini
-        # Atau lu bisa langsung commit file w.txt lu ke dalam repo ini sebelum di-run.
-        # Baris di bawah ini asumsi lu udah upload file w.txt ke root repo lu:
-        echo "Menyiapkan file w.txt..."
-
     - name: Build Tool
+      # Kita langsung build file .csproj yang ada di folder root hasil fork lu
       run: dotnet build -c Release
 
     - name: Run Deobfuscator
+      # Di sini jalurnya gua benerin murni ke file .csproj yang pas
       run: |
-        dotnet run --project MoonsecDeobfuscator/MoonsecDeobfuscator.csproj -- -dev -i w.txt -o hasil_bongkar.luac
-        dotnet run --project MoonsecDeobfuscator/MoonsecDeobfuscator.csproj -- -dis -i w.txt -o hasil_disassembly.txt
+        dotnet run --project MoonsecDeobfuscator.csproj -- -dev -i w.txt -o hasil_bongkar.luac
+        dotnet run --project MoonsecDeobfuscator.csproj -- -dis -i w.txt -o hasil_disassembly.txt
 
     - name: Upload Hasil Bongkar ke Artifacts
       uses: actions/upload-artifact@v4
@@ -38,4 +33,3 @@ jobs:
         path: |
           hasil_bongkar.luac
           hasil_disassembly.txt
-          
